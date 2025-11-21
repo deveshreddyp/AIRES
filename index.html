@@ -1,0 +1,999 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VN Infra Reyality (Pro Local)</title>
+    
+    <!-- 1. LOAD PDF LIBRARIES -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <script>pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';</script>
+    <!-- 2. CHART.JS FOR ANALYTICS -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <style>
+        /* --- STYLES --- */
+        :root {
+            --primary: #2563eb; --accent: #f97316; --bg: #f8fafc; --surface: #ffffff;
+            --text: #0f172a; --border: #e2e8f0; --success: #10b981; --danger: #ef4444;
+        }
+        body.dark { 
+            --bg: #0f172a; --surface: #1e293b; --text: #f8fafc; --border: #334155; 
+            --primary: #3b82f6; 
+        }
+        
+        * { box-sizing: border-box; transition: background 0.3s, color 0.3s; }
+        body { font-family: 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); margin: 0; display: flex; flex-direction: column; min-height: 100vh; }
+        
+        .navbar { background: var(--surface); padding: 1rem 2rem; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 4px rgba(0,0,0,0.05); position: sticky; top: 0; z-index: 50; }
+        .brand { display: flex; align-items: center; gap: 10px; font-weight: bold; color: var(--primary); cursor: pointer; font-size: 1.2rem; }
+        .brand img { height: 32px; border-radius: 50%; object-fit: cover; }
+        
+        .container { max-width: 1200px; margin: 2rem auto; padding: 0 1rem; width: 100%; flex: 1; }
+        .center-box { max-width: 450px; margin: 3rem auto; text-align: center; }
+        
+        .card { background: var(--surface); padding: 2rem; border-radius: 12px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); border: 1px solid var(--border); margin-bottom: 1.5rem; }
+        .card-top { border-top: 4px solid var(--primary); }
+        
+        .btn { background: var(--primary); color: white; padding: 0.75rem 1.5rem; border-radius: 8px; border: none; cursor: pointer; font-weight: 600; width: 100%; margin-bottom: 0.5rem; }
+        .btn:hover { opacity: 0.9; transform: translateY(-1px); }
+        .btn-outline { background: transparent; border: 1px solid var(--border); color: var(--text); }
+        .btn-danger { background: var(--danger); }
+        .btn-sm { padding: 0.25rem 0.5rem; font-size: 0.9rem; width: auto; }
+        
+        input, select, textarea { width: 100%; padding: 0.75rem; border: 1px solid var(--border); border-radius: 6px; margin: 0.5rem 0 1rem; background: var(--bg); color: var(--text); }
+        
+        .grid { display: grid; grid-template-columns: 250px 1fr; gap: 2rem; }
+        .stat-card { text-align: center; padding: 1rem; background: var(--bg); border-radius: 8px; }
+        .stat-val { font-size: 2rem; font-weight: bold; color: var(--primary); }
+        
+        table { width: 100%; border-collapse: collapse; margin-top: 1rem; }
+        th, td { padding: 1rem; text-align: left; border-bottom: 1px solid var(--border); }
+        
+        /* Kanban Styles */
+        .kanban-board { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; margin-top: 1rem; }
+        .kanban-col { background: var(--bg); padding: 1rem; border-radius: 8px; min-height: 200px; }
+        .kanban-card { background: var(--surface); padding: 1rem; border-radius: 6px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); margin-bottom: 0.5rem; cursor: pointer; border-left: 4px solid var(--primary); }
+        .kanban-card h4 { margin: 0 0 0.5rem 0; font-size: 1rem; }
+        .kanban-header { font-weight: bold; margin-bottom: 1rem; display: flex; justify-content: space-between; }
+        
+        .modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); align-items: center; justify-content: center; z-index: 100; }
+        .modal.open { display: flex; }
+        .modal-box { background: var(--surface); padding: 2rem; border-radius: 12px; width: 90%; max-width: 600px; max-height: 90vh; overflow-y: auto; position: relative; }
+        
+        .hidden { display: none !important; }
+        .text-sm { font-size: 0.875rem; color: #64748b; }
+        
+        .status-badge { padding: 0.25rem 0.75rem; border-radius: 99px; font-size: 0.85rem; font-weight: 600; }
+        .st-Shortlisted { background: #d1fae5; color: #065f46; }
+        .st-Rejected { background: #fee2e2; color: #991b1b; }
+        .st-Pending { background: #fef3c7; color: #92400e; }
+
+        /* Loading Overlay */
+        .loading-overlay { position: fixed; inset: 0; background: rgba(255,255,255,0.9); z-index: 200; display: none; flex-direction: column; align-items: center; justify-content: center; }
+        .spinner { width: 50px; height: 50px; border: 5px solid #f3f3f3; border-top: 5px solid var(--primary); border-radius: 50%; animation: spin 1s linear infinite; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+        /* Chatbot */
+        .chat-btn { position: fixed; bottom: 20px; right: 20px; width: 60px; height: 60px; background: var(--primary); border-radius: 50%; color: white; display: flex; align-items: center; justify-content: center; cursor: pointer; box-shadow: 0 4px 12px rgba(0,0,0,0.2); z-index: 60; }
+        .chat-window { position: fixed; bottom: 90px; right: 20px; width: 350px; height: 500px; background: var(--surface); border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); border: 1px solid var(--border); display: none; flex-direction: column; z-index: 60; }
+        .chat-body { flex: 1; padding: 1rem; overflow-y: auto; display: flex; flex-direction: column; gap: 0.5rem; }
+        .msg { padding: 0.5rem 1rem; border-radius: 20px; max-width: 80%; font-size: 0.9rem; }
+        .msg.user { background: var(--primary); color: white; align-self: flex-end; border-bottom-right-radius: 4px; }
+        .msg.bot { background: var(--bg); color: var(--text); align-self: flex-start; border-bottom-left-radius: 4px; }
+
+        @media(max-width: 768px) { .grid, .kanban-board { grid-template-columns: 1fr; } }
+    </style>
+</head>
+<body>
+
+    <!-- === NAVBAR === -->
+    <nav class="navbar">
+        <div class="brand" onclick="app.nav('home')">
+            <img src="vn.jpg" onerror="this.src='https://ui-avatars.com/api/?name=VN&background=2563eb&color=fff'" alt="Logo">
+            <span>VN Infra Reyality</span>
+        </div>
+        <div style="display: flex; align-items: center;">
+            <a href="https://vr-infra-website.web.app" target="_blank" class="btn btn-sm btn-outline" style="text-decoration: none; margin-right: 10px; color: var(--primary); border-color: var(--primary);">Main Website</a>
+            <div id="nav-links"></div>
+            <span class="settings-icon" onclick="document.body.classList.toggle('dark')" title="Toggle Dark Mode" style="cursor:pointer; margin-right:1rem;">🌓</span>
+            <span class="settings-icon" onclick="document.getElementById('modal-settings').classList.add('open')" title="AI Settings" style="cursor:pointer; margin-left:1rem;">⚙️</span>
+        </div>
+    </nav>
+
+    <!-- LOADING OVERLAY -->
+    <div id="loading-overlay" class="loading-overlay">
+        <div class="spinner"></div>
+        <h3 style="margin-top: 1rem; color: var(--primary);">Consulting AI...</h3>
+        <p id="loading-text" class="text-sm">Analyzing resume matches & generating questions</p>
+    </div>
+
+    <!-- SETTINGS MODAL -->
+    <div id="modal-settings" class="modal">
+        <div class="modal-box">
+            <span onclick="this.closest('.modal').classList.remove('open')" style="float:right; cursor:pointer;">&times;</span>
+            <h2>⚙️ AI Settings</h2>
+            <label>AI Provider</label>
+            <select id="ai-provider" style="margin-bottom: 1rem;" onchange="ai.toggleProviderInfo()">
+                <option value="gemini" selected>Google Gemini (Free Tier)</option>
+                <option value="groq">Groq (Free & Fast Llama 3)</option>
+                <option value="openai">OpenAI (Paid)</option>
+            </select>
+            <label>API Key</label>
+            <input type="text" id="custom-api-key" placeholder="Paste API Key here..." style="font-family: monospace;">
+            <div style="display: flex; gap: 1rem;">
+                <button onclick="ai.saveSettings()" class="btn">Save & Test</button>
+                <button onclick="ai.clearKey()" class="btn btn-danger" style="background: #94a3b8;">Reset</button>
+            </div>
+            <button onclick="ai.enableDemoMode()" class="btn btn-outline" style="margin-top: 1rem; width: 100%;">⚠️ Enable Demo Mode (No Key)</button>
+            <div id="key-status" style="margin-top: 1rem; font-weight: bold; white-space: pre-wrap;"></div>
+            <hr style="margin: 1.5rem 0; border: 0; border-top: 1px solid var(--border);">
+            <div id="provider-help" class="text-sm" style="background: #eff6ff; padding: 0.5rem; border-radius: 4px;"></div>
+        </div>
+    </div>
+
+    <!-- GLOBAL ERROR MODAL -->
+    <div id="modal-error" class="modal">
+        <div class="modal-box" style="border-top: 5px solid var(--danger);">
+            <h2 style="color: var(--danger);">System Alert</h2>
+            <div id="error-msg-text" style="white-space: pre-wrap; padding: 1rem; background: #fff1f2; border-radius: 8px; color: #9f1239; font-family: monospace;"></div>
+            <button onclick="document.getElementById('modal-error').classList.remove('open')" class="btn btn-outline" style="margin-top: 1rem;">Close</button>
+        </div>
+    </div>
+
+    <!-- === VIEW: HOME === -->
+    <section id="view-home" class="container center-box">
+        <div class="card card-top">
+            <h1 style="color: var(--primary);">Welcome Portal</h1>
+            <p style="margin-bottom: 2rem; color: #64748b;">AI-Powered Recruitment System</p>
+            <button onclick="app.nav('login')" class="btn btn-outline">Recruiter Login</button>
+            <button onclick="app.nav('candidate')" class="btn">Candidate Resume Check</button>
+            <button onclick="app.nav('apply')" class="btn btn-success" style="background: var(--success);">Apply for Job</button>
+            <div style="margin-top: 2rem; font-size: 0.9rem;">
+                <a href="#" onclick="document.getElementById('modal-about').classList.add('open')">About</a> • 
+                <a href="#" onclick="document.getElementById('modal-team').classList.add('open')">Team</a>
+            </div>
+        </div>
+    </section>
+
+    <!-- === VIEW: LOGIN === -->
+    <section id="view-login" class="container center-box hidden">
+        <div class="card card-top">
+            <h2>Recruiter Access</h2>
+            <form onsubmit="auth.login(event)">
+                <input type="password" id="login-pass" placeholder="Enter Access Code..." required>
+                <button class="btn">Login</button>
+                <p id="login-err" style="color: var(--danger); display: none;">Incorrect Access Code</p>
+            </form>
+            <button onclick="app.nav('home')" class="btn btn-outline" style="margin-top: 1rem;">Cancel</button>
+        </div>
+    </section>
+
+    <!-- === VIEW: RECRUITER DASHBOARD === -->
+    <section id="view-dashboard" class="container hidden">
+        <div class="grid">
+            <aside>
+                <div class="card">
+                    <h3>Menu</h3>
+                    <button class="btn btn-outline" onclick="dashboard.load()">↻ Refresh</button>
+                    <button class="btn btn-outline" onclick="dashboard.toggleViewMode()">📊 Toggle View</button>
+                    <button class="btn btn-outline" onclick="dashboard.toggleAnalytics()">📈 Analytics</button>
+                    <button class="btn btn-outline" onclick="dashboard.exportCSV()">📥 Export CSV</button>
+                    <button class="btn btn-outline" onclick="dashboard.openManageJobs()">💼 Jobs</button>
+                    <button class="btn btn-danger" onclick="app.nav('home')">Logout</button>
+                </div>
+            </aside>
+            <main>
+                <div class="card" style="display: flex; gap: 1rem; justify-content: space-around;">
+                    <div class="stat-card">
+                        <div class="text-sm">Total Apps</div>
+                        <div class="stat-val" id="stat-total">0</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="text-sm">Shortlisted</div>
+                        <div class="stat-val" id="stat-short">0</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="text-sm">Avg Score</div>
+                        <div class="stat-val" id="stat-avg">0%</div>
+                    </div>
+                </div>
+                
+                <!-- ANALYTICS CHART CONTAINER -->
+                <div id="analytics-container" class="card hidden">
+                    <canvas id="analyticsChart"></canvas>
+                </div>
+
+                <div class="card">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem;">
+                        <h3>Applications</h3>
+                        <input type="text" id="search-input" placeholder="🔍 Search name or role..." onkeyup="dashboard.load()" style="width: 200px; margin:0; padding:0.5rem;">
+                    </div>
+                    
+                    <div id="view-table">
+                        <div style="overflow-x: auto;">
+                            <table>
+                                <thead><tr><th>Name</th><th>Role</th><th>Score</th><th>Status</th><th>Actions</th></tr></thead>
+                                <tbody id="table-body"></tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div id="view-board" class="kanban-board hidden">
+                        <div class="kanban-col" style="border-top: 3px solid #f59e0b;">
+                            <div class="kanban-header">Pending <span id="cnt-pending">0</span></div>
+                            <div id="board-pending"></div>
+                        </div>
+                        <div class="kanban-col" style="border-top: 3px solid #10b981;">
+                            <div class="kanban-header">Shortlisted <span id="cnt-shortlisted">0</span></div>
+                            <div id="board-shortlisted"></div>
+                        </div>
+                        <div class="kanban-col" style="border-top: 3px solid #ef4444;">
+                            <div class="kanban-header">Rejected <span id="cnt-rejected">0</span></div>
+                            <div id="board-rejected"></div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="card">
+                    <h3>Post New Job</h3>
+                    <form onsubmit="dashboard.addJob(event)">
+                        <div style="display: flex; gap: 0.5rem; align-items: center;">
+                            <input id="job-title" placeholder="Job Title (e.g. Site Engineer)" required style="flex: 1;">
+                            <button type="button" onclick="dashboard.generateJD()" class="btn" style="width: auto; margin-bottom: 1rem; background: var(--accent);">✨ AI Write</button>
+                        </div>
+                        <textarea id="job-desc" placeholder="Job Description / Requirements" rows="4" required></textarea>
+                        <button class="btn">Post Job</button>
+                    </form>
+                </div>
+            </main>
+        </div>
+    </section>
+
+    <!-- === VIEW: CANDIDATE CHECK === -->
+    <section id="view-candidate" class="container hidden">
+        <div class="card">
+            <h2>Resume Match Checker</h2>
+            <p class="text-sm">Upload your PDF and paste the JD to see your AI match score.</p>
+            <form onsubmit="ai.checkResume(event)">
+                <label>1. Upload Resume (PDF)</label>
+                <input type="file" id="chk-file" accept="application/pdf" required>
+                <label>2. Paste Job Description</label>
+                <textarea id="chk-jd" rows="5" placeholder="Paste JD text here..." required></textarea>
+                <button id="chk-btn" class="btn">Analyze Resume</button>
+            </form>
+            <div id="chk-result" class="card" style="margin-top: 1rem; background: #eff6ff; display: none;"></div>
+        </div>
+    </section>
+
+    <!-- === VIEW: APPLY === -->
+    <section id="view-apply" class="container hidden">
+        <div class="card">
+            <h2>Submit Application</h2>
+            <form onsubmit="apply.submit(event)">
+                <label>Full Name</label>
+                <input id="app-name" required>
+                <label>Email</label>
+                <input id="app-email" type="email" required>
+                <label>Select Position</label>
+                <select id="app-job" required><option>Loading...</option></select>
+                <label>Upload Resume (PDF)</label>
+                <input type="file" id="app-file" accept="application/pdf" required>
+                <p class="text-sm" style="margin-top: 0.25rem; color: var(--success);">* Files are saved securely in your browser (IndexedDB).</p>
+                <button id="app-btn" class="btn btn-success">Submit Application</button>
+            </form>
+        </div>
+    </section>
+
+    <!-- === MODALS === -->
+    <div id="modal-detail" class="modal">
+        <div class="modal-box">
+            <span onclick="this.closest('.modal').classList.remove('open')" style="float:right; cursor:pointer; font-size: 1.5rem;">&times;</span>
+            <h2 id="m-name">Name</h2>
+            <div style="background: var(--bg); padding: 1rem; border-radius: 8px; margin: 1rem 0;"><p id="m-summary" style="font-style: italic;"></p></div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                <div><h4 style="color: var(--success);">Matching Skills</h4><ul id="m-match" style="padding-left: 1rem;"></ul></div>
+                <div><h4 style="color: var(--danger);">Missing Skills</h4><ul id="m-miss" style="padding-left: 1rem;"></ul></div>
+            </div>
+            <hr style="border: 0; border-top: 1px solid var(--border); margin: 1rem 0;">
+            <label>Interview Questions (AI Generated)</label>
+            <ul id="m-ques" style="padding-left: 1rem; background: var(--bg); padding: 1rem; border-radius: 8px;"></ul>
+            <div style="margin-top: 1rem; display: flex; gap: 1rem; flex-wrap: wrap;">
+                <select id="m-status" style="margin: 0; flex:1;"><option>Pending</option><option>Shortlisted</option><option>Rejected</option></select>
+                <button onclick="dashboard.updateStatus()" class="btn" style="width: auto;">Update</button>
+                <button onclick="dashboard.draftEmail()" class="btn btn-outline" style="width: auto;">✉️ Email</button>
+                <button onclick="dashboard.startInterview()" class="btn" style="width: auto; background: #8b5cf6;">🎤 Interview</button>
+                <!-- NEW RE-ANALYZE BUTTON -->
+                <button onclick="dashboard.reAnalyze()" class="btn" style="width: auto; background: var(--primary);">🤖 Re-Evaluate</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MANAGE JOBS MODAL -->
+    <div id="modal-jobs" class="modal">
+        <div class="modal-box">
+            <span onclick="this.closest('.modal').classList.remove('open')" style="float:right; cursor:pointer; font-size: 1.5rem;">&times;</span>
+            <h2>Manage Job Postings</h2>
+            <ul id="jobs-list" style="padding:0; list-style:none;"></ul>
+        </div>
+    </div>
+
+    <div id="modal-about" class="modal">
+        <div class="modal-box">
+            <span onclick="this.closest('.modal').classList.remove('open')" style="float:right; cursor:pointer;">&times;</span>
+            <h2>About VN Infra Portal</h2>
+            <p><b>Edition:</b> Pro Local</p>
+            <p>Uses IndexedDB to store full PDF files inside the browser.</p>
+        </div>
+    </div>
+
+    <div id="modal-team" class="modal">
+        <div class="modal-box">
+            <span onclick="this.closest('.modal').classList.remove('open')" style="float:right; cursor:pointer;">&times;</span>
+            <h2>Recruitment Team</h2>
+            <p><b>Devesh Reddy</b> - SWD (pure23ainds@cmrit.ac.in)</p>
+            <p><b>Nihal DR</b> - Support (nidr23ainds@cmrit.ac.in)</p>
+            <p><b>Tanusree Reddy</b> - HR (mre23ainds@cmrit.ac.in)</p>
+        </div>
+    </div>
+
+    <!-- === CHATBOT === -->
+    <div class="chat-btn" onclick="document.getElementById('chat-window').style.display='flex'">💬</div>
+    <div id="chat-window" class="chat-window">
+        <div style="padding: 1rem; background: var(--primary); color: white; border-radius: 12px 12px 0 0; display: flex; justify-content: space-between; align-items: center;">
+            <span>VN Infra AI</span>
+            <div>
+                <span style="cursor: pointer; margin-right: 10px;" onclick="ai.stopSpeaking()" title="Stop Voice">🔇</span>
+                <span style="cursor: pointer;" onclick="document.getElementById('chat-window').style.display='none'">&times;</span>
+            </div>
+        </div>
+        <div id="chat-body" class="chat-body"><div class="msg bot">Hello! Ask me anything about recruitment.</div></div>
+        <form onsubmit="ai.chat(event)" style="padding: 0.5rem; border-top: 1px solid var(--border); display: flex;">
+            <input id="chat-in" placeholder="Type..." style="margin: 0; border: none;">
+            <button class="btn" style="width: auto; margin: 0; border-radius: 0 6px 6px 0;">Send</button>
+        </form>
+    </div>
+
+    <!-- === LOGIC === -->
+    <script>
+        // === 1. LOCAL STORAGE DATABASE ===
+        const LocalDB = {
+            get: (col) => JSON.parse(localStorage.getItem('vn_'+col) || '[]'),
+            save: (col, data) => localStorage.setItem('vn_'+col, JSON.stringify(data)),
+            add: (col, doc) => {
+                const list = LocalDB.get(col);
+                if(!doc.id) doc.id = 'doc_' + Date.now();
+                list.push(doc);
+                LocalDB.save(col, list);
+                return doc;
+            },
+            update: (col, id, updates) => {
+                const list = LocalDB.get(col);
+                const idx = list.findIndex(d => d.id === id);
+                if(idx !== -1) { list[idx] = {...list[idx], ...updates}; LocalDB.save(col, list); }
+            },
+            delete: (col, id) => {
+                const list = LocalDB.get(col).filter(d => d.id !== id);
+                LocalDB.save(col, list);
+            }
+        };
+
+        // Seed Initial Jobs if Empty
+        const existingJobs = LocalDB.get('jobs');
+        if (existingJobs.length === 0) {
+            LocalDB.add('jobs', { title: "Site Reliability Engineer", description: "Manage infrastructure using Terraform and Kubernetes. Monitor system health. Experience with AWS is a must.", created: new Date() });
+            LocalDB.add('jobs', { title: "Frontend Developer", description: "Build responsive UI using React and Tailwind CSS. Optimize application performance.", created: new Date() });
+            LocalDB.add('jobs', { title: "Backend Developer", description: "Design APIs using Node.js and Express. Manage Database schemas and scaling.", created: new Date() });
+        }
+
+        // === 2. INDEXED DB ===
+        const FileDB = {
+            dbName: 'VN_Infra_Files', storeName: 'resumes',
+            open: () => new Promise((res, rej) => {
+                const req = indexedDB.open(FileDB.dbName, 1);
+                req.onupgradeneeded = e => e.target.result.createObjectStore(FileDB.storeName);
+                req.onsuccess = e => res(e.target.result);
+                req.onerror = e => rej(e);
+            }),
+            saveFile: async (id, file) => {
+                const db = await FileDB.open();
+                return new Promise((res, rej) => {
+                    const tx = db.transaction(FileDB.storeName, 'readwrite');
+                    tx.objectStore(FileDB.storeName).put(file, id);
+                    tx.oncomplete = () => res(); tx.onerror = e => rej(e);
+                });
+            },
+            getFile: async (id) => {
+                const db = await FileDB.open();
+                return new Promise((res, rej) => {
+                    const req = db.transaction(FileDB.storeName, 'readonly').objectStore(FileDB.storeName).get(id);
+                    req.onsuccess = () => res(req.result); req.onerror = e => rej(e);
+                });
+            },
+            deleteFile: async (id) => {
+                const db = await FileDB.open();
+                db.transaction(FileDB.storeName, 'readwrite').objectStore(FileDB.storeName).delete(id);
+            }
+        };
+
+        const GROQ_DEFAULT_KEY = "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"; 
+        const GOOGLE_DEFAULT_KEY = ""; 
+        const OPENAI_DEFAULT_KEY = ""; 
+
+        try {
+            const savedKey = localStorage.getItem('custom_api_key');
+            const savedProvider = localStorage.getItem('ai_provider') || 'groq';
+            if(savedKey) document.getElementById('custom-api-key').value = savedKey;
+            document.getElementById('ai-provider').value = savedProvider;
+            
+            if(localStorage.getItem('force_mock') === 'true') {
+                // Demo mode logic if needed
+            }
+        } catch(e) { console.error(e); }
+
+        function showModal(msg) {
+            document.getElementById('error-msg-text').textContent = msg;
+            document.getElementById('modal-error').classList.add('open');
+        }
+
+        function showLoading(show) {
+            document.getElementById('loading-overlay').style.display = show ? 'flex' : 'none';
+        }
+
+        const app = {
+            nav: (view) => {
+                document.querySelectorAll('section').forEach(el => el.classList.add('hidden'));
+                document.getElementById(`view-${view}`).classList.remove('hidden');
+                if(view === 'dashboard') dashboard.load();
+                if(view === 'apply') apply.loadJobs();
+            }
+        };
+
+        const auth = {
+            login: (e) => {
+                e.preventDefault();
+                if(document.getElementById('login-pass').value.toLowerCase().trim() === 'deva') {
+                    document.getElementById('login-pass').value = '';
+                    app.nav('dashboard');
+                } else {
+                    document.getElementById('login-err').style.display = 'block';
+                }
+            }
+        };
+
+        const ai = {
+            isMockMode: false,
+
+            toggleProviderInfo: () => {
+                const provider = document.getElementById('ai-provider').value;
+                const help = document.getElementById('provider-help');
+                if(provider === 'gemini') {
+                    help.innerHTML = `<b>Google Gemini:</b> Best for free tier. <a href="https://aistudio.google.com/app/apikey" target="_blank">Get Free Key</a>`;
+                } else if(provider === 'groq') {
+                    help.innerHTML = `<b>Groq:</b> Fast & Free Llama models. <a href="https://console.groq.com/keys" target="_blank">Get Free Key</a>`;
+                } else {
+                    help.innerHTML = `<b>OpenAI:</b> Requires paid credits. <a href="https://platform.openai.com/api-keys" target="_blank">Get Paid Key</a>`;
+                }
+            },
+
+            enableDemoMode: () => {
+                ai.isMockMode = true;
+                localStorage.setItem('force_mock', 'true');
+                document.getElementById('modal-settings').classList.remove('open');
+                alert("Demo Mode Enabled! The app will simulate AI responses.");
+            },
+
+            generate: async (prompt) => {
+                if (ai.isMockMode || localStorage.getItem('force_mock') === 'true') {
+                    throw new Error("MOCK_MODE");
+                }
+
+                const provider = document.getElementById('ai-provider').value; 
+                let key = document.getElementById('custom-api-key').value.trim();
+                
+                if (!key) {
+                    if (provider === 'groq') key = GROQ_DEFAULT_KEY; // Use fallback for Groq
+                    else throw new Error(`Please enter a valid ${provider} API Key in Settings.`);
+                }
+
+                // GROQ
+                if (provider === 'groq') {
+                    try {
+                        const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json", "Authorization": `Bearer ${key}` },
+                            body: JSON.stringify({ model: "llama-3.3-70b-versatile", messages: [{ role: "user", content: prompt }] })
+                        });
+                        if(!response.ok) {
+                            const err = await response.json();
+                            throw new Error(err.error?.message || "Groq Error");
+                        }
+                        return (await response.json()).choices[0].message.content;
+                    } catch(e) { throw e; }
+                }
+
+                // GEMINI
+                else if (provider === 'gemini') {
+                    const models = ["gemini-1.5-flash", "gemini-1.5-pro"];
+                    for (const model of models) {
+                        try {
+                            const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`;
+                            const response = await fetch(url, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }) });
+                            if (response.status === 429) { await ai.delay(2000); continue; }
+                            if (!response.ok) continue;
+                            return (await response.json()).candidates[0].content.parts[0].text;
+                        } catch(e) {}
+                    }
+                    throw new Error("Google API Failed: Quota or Key Invalid");
+                } 
+                
+                // OPENAI
+                else if (provider === 'openai') {
+                    const response = await fetch("https://api.openai.com/v1/chat/completions", {
+                        method: "POST", headers: { "Content-Type": "application/json", "Authorization": `Bearer ${key}` },
+                        body: JSON.stringify({ model: "gpt-4o-mini", messages: [{ role: "user", content: prompt }] })
+                    });
+                    if(!response.ok) {
+                        const err = await response.json();
+                        throw new Error(`OpenAI Error: ${err.error?.message}`);
+                    }
+                    return (await response.json()).choices[0].message.content;
+                }
+            },
+
+            saveSettings: async () => {
+                const key = document.getElementById('custom-api-key').value.trim();
+                const provider = document.getElementById('ai-provider').value;
+                const status = document.getElementById('key-status');
+                
+                if(!key && provider !== 'groq') { alert("Please paste a key first."); return; }
+
+                status.style.display = 'block'; status.style.color = 'orange'; status.textContent = `Testing connection...`;
+
+                try {
+                    localStorage.setItem('custom_api_key', key);
+                    localStorage.setItem('ai_provider', provider);
+                    localStorage.removeItem('force_mock'); // Clear mock if saving new key
+                    ai.isMockMode = false;
+                    
+                    await ai.generate("Say hello"); // Validate Key
+                    
+                    status.style.color = 'var(--success)'; 
+                    status.textContent = `✅ Success! Connected to ${provider}.`;
+                } catch(e) {
+                    status.style.color = 'var(--danger)'; 
+                    status.textContent = "❌ Failed: " + e.message;
+                }
+            },
+
+            clearKey: () => {
+                localStorage.removeItem('custom_api_key');
+                document.getElementById('custom-api-key').value = '';
+                alert("Settings cleared.");
+            },
+
+            readPdf: async (file) => {
+                const arrayBuffer = await file.arrayBuffer();
+                const pdf = await pdfjsLib.getDocument(arrayBuffer).promise;
+                let text = "";
+                for(let i = 1; i <= pdf.numPages; i++) {
+                    const page = await pdf.getPage(i);
+                    const content = await page.getTextContent();
+                    text += content.items.map(item => item.str).join(" ") + " ";
+                }
+                return text;
+            },
+
+            delay: (ms) => new Promise(r => setTimeout(r, ms)),
+
+            getMockResponse: (type) => {
+                ai.isMockMode = true;
+                localStorage.setItem('force_mock', 'true');
+                if (type === 'json') return JSON.stringify({ matchScore: 82, status: "Shortlisted", summary: "[DEMO] AI unavailable. Resume shows strong matching skills but lacks specifics.", matching: ["Leadership", "Coding"], missing: ["Specific Tools"], questions: ["Explain experience."] });
+                if (type === 'interview') return "Tell me about a time you solved a problem.";
+                return "Demo Mode active.";
+            },
+
+            checkResume: async (e) => {
+                e.preventDefault();
+                const btn = document.getElementById('chk-btn');
+                const resDiv = document.getElementById('chk-result');
+                let usingMock = false;
+                try {
+                    btn.disabled = true; btn.textContent = "Reading PDF...";
+                    const file = document.getElementById('chk-file').files[0];
+                    const jd = document.getElementById('chk-jd').value;
+                    const pdfText = await ai.readPdf(file);
+                    
+                    showLoading(true);
+                    const prompt = `Act as a Recruiter. Compare Resume to JD. Return ONLY valid JSON. Format: {"matchScore": 85, "status": "Shortlisted/Rejected", "summary": "...", "matching": ["A"], "missing": ["B"], "questions": ["Q1"]} RESUME: ${pdfText.substring(0, 5000)} JD: ${jd}`;
+                    
+                    let raw;
+                    try { raw = await ai.generate(prompt); } 
+                    catch (apiErr) { 
+                        raw = ai.getMockResponse('json'); usingMock = true; 
+                        showModal(apiErr.message + "\n\nSwitched to Demo Mode."); 
+                    }
+                    showLoading(false);
+                    
+                    const json = JSON.parse(raw.replace(/```json|```/g, '').trim());
+                    resDiv.style.display = 'block';
+                    resDiv.innerHTML = `<h3 style="color:var(--primary);">Match Score: ${json.matchScore}% ${usingMock ? '(Simulated)' : ''}</h3><p>${json.summary}</p><p><b>Matching:</b> ${(json.matching||[]).join(', ')}</p><p style="color:var(--danger);"><b>Missing:</b> ${(json.missing||[]).join(', ')}</p>`;
+                } catch (err) { showLoading(false); alert("Error: " + err.message); } finally { btn.disabled = false; btn.textContent = "Analyze Resume"; }
+            },
+
+            chat: async (e) => {
+                e.preventDefault();
+                const inp = document.getElementById('chat-in');
+                const txt = inp.value.trim();
+                if(!txt) return;
+                const body = document.getElementById('chat-body');
+                body.innerHTML += `<div class="msg user">${txt}</div>`;
+                inp.value = '';
+                try {
+                    let reply;
+                    try { reply = await ai.generate(`You are a helpful HR assistant. User says: ${txt}`); } 
+                    catch (e) { reply = ai.getMockResponse('chat'); }
+                    body.innerHTML += `<div class="msg bot">${reply}</div>`;
+                } catch(err) { body.innerHTML += `<div class="msg bot" style="color:red;">Error.</div>`; }
+                body.scrollTop = body.scrollHeight;
+            },
+
+            speak: (text) => {
+                if (!window.speechSynthesis) return;
+                const u = new SpeechSynthesisUtterance(text);
+                window.speechSynthesis.speak(u);
+            },
+
+            stopSpeaking: () => {
+                if (window.speechSynthesis) window.speechSynthesis.cancel();
+            }
+        };
+
+        const dashboard = {
+            currentAppId: null,
+            currentAppData: null,
+            viewMode: 'table',
+            chartInstance: null, // Store chart instance
+
+            toggleViewMode: () => {
+                dashboard.viewMode = dashboard.viewMode === 'table' ? 'board' : 'table';
+                dashboard.load();
+            },
+
+            toggleAnalytics: () => {
+                const container = document.getElementById('analytics-container');
+                if (container.classList.contains('hidden')) {
+                    container.classList.remove('hidden');
+                    dashboard.renderChart();
+                } else {
+                    container.classList.add('hidden');
+                }
+            },
+
+            renderChart: () => {
+                const apps = LocalDB.get('applications');
+                const pending = apps.filter(a => a.status === 'Pending').length;
+                const shortlisted = apps.filter(a => a.status === 'Shortlisted').length;
+                const rejected = apps.filter(a => a.status === 'Rejected').length;
+
+                const ctx = document.getElementById('analyticsChart').getContext('2d');
+                
+                if (dashboard.chartInstance) {
+                    dashboard.chartInstance.destroy();
+                }
+
+                dashboard.chartInstance = new Chart(ctx, {
+                    type: 'doughnut',
+                    data: {
+                        labels: ['Pending', 'Shortlisted', 'Rejected'],
+                        datasets: [{
+                            data: [pending, shortlisted, rejected],
+                            backgroundColor: ['#f59e0b', '#10b981', '#ef4444'],
+                            borderWidth: 0
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: { position: 'right' }
+                        }
+                    }
+                });
+            },
+
+            load: () => {
+                const search = document.getElementById('search-input').value.toLowerCase();
+                let apps = LocalDB.get('applications').sort((a,b) => new Date(b.timestamp) - new Date(a.timestamp));
+                
+                if(search) {
+                    apps = apps.filter(d => d.name.toLowerCase().includes(search) || d.jobTitle.toLowerCase().includes(search));
+                }
+
+                if (dashboard.viewMode === 'table') {
+                    document.getElementById('view-table').classList.remove('hidden');
+                    document.getElementById('view-board').classList.add('hidden');
+                    const tbody = document.getElementById('table-body');
+                    tbody.innerHTML = '';
+                    apps.forEach(d => {
+                        const safeData = encodeURIComponent(JSON.stringify(d));
+                        const stClass = `st-${d.status}`;
+                        // Fixed downloadPdf call to remove name argument to prevent syntax errors with quotes
+                        tbody.innerHTML += `<tr>
+                            <td style="font-weight:bold; color:var(--primary); cursor:pointer;" onclick="dashboard.openModal('${safeData}')">${d.name}</td>
+                            <td>${d.jobTitle}</td>
+                            <td>${d.score}%</td>
+                            <td><span class="status-badge ${stClass}">${d.status}</span></td>
+                            <td>
+                                <button class="btn btn-sm btn-outline" onclick="dashboard.downloadPdf('${d.id}')">📄</button>
+                                <button class="btn btn-sm btn-danger" style="margin-left:5px;" onclick="dashboard.del('${d.id}')">🗑️</button>
+                            </td>
+                        </tr>`;
+                    });
+                } else {
+                    document.getElementById('view-table').classList.add('hidden');
+                    document.getElementById('view-board').classList.remove('hidden');
+                    const cols = { 'Pending': [], 'Shortlisted': [], 'Rejected': [] };
+                    apps.forEach(d => cols[d.status] ? cols[d.status].push(d) : cols['Pending'].push(d));
+                    ['Pending', 'Shortlisted', 'Rejected'].forEach(status => {
+                        document.getElementById(`cnt-${status.toLowerCase()}`).innerText = cols[status].length;
+                        const container = document.getElementById(`board-${status.toLowerCase()}`);
+                        container.innerHTML = '';
+                        cols[status].forEach(d => {
+                            const safeData = encodeURIComponent(JSON.stringify(d));
+                            container.innerHTML += `<div class="kanban-card" onclick="dashboard.openModal('${safeData}')">
+                                <h4>${d.name}</h4>
+                                <div class="text-sm">${d.jobTitle}</div>
+                                <div class="text-sm" style="margin-top:5px; font-weight:bold;">Score: ${d.score}%</div>
+                            </div>`;
+                        });
+                    });
+                }
+                
+                let total = apps.length;
+                let short = apps.filter(a => a.status === 'Shortlisted').length;
+                let avg = total ? Math.round(apps.reduce((a, c) => a + c.score, 0) / total) : 0;
+                document.getElementById('stat-total').innerText = total;
+                document.getElementById('stat-short').innerText = short;
+                document.getElementById('stat-avg').innerText = avg + '%';
+            },
+            
+            openModal: (encodedData) => {
+                const d = JSON.parse(decodeURIComponent(encodedData));
+                dashboard.currentAppId = d.id;
+                dashboard.currentAppData = d;
+                document.getElementById('m-name').innerText = d.name + ` (${d.score}%)`;
+                document.getElementById('m-summary').innerText = d.summary;
+                
+                // SAFE MAP: Check if arrays exist before mapping
+                const matchHtml = (d.matching || []).map(x => `<li>${x}</li>`).join('');
+                const missHtml = (d.missing || []).map(x => `<li>${x}</li>`).join('');
+                const quesHtml = (d.questions || []).map(x => `<li>${x}</li>`).join('');
+                
+                document.getElementById('m-match').innerHTML = matchHtml || '<li>No matching skills found</li>';
+                document.getElementById('m-miss').innerHTML = missHtml || '<li>No missing skills found</li>';
+                document.getElementById('m-ques').innerHTML = quesHtml || '<li>No questions generated</li>';
+                
+                document.getElementById('m-status').value = d.status;
+                document.getElementById('modal-detail').classList.add('open');
+            },
+            
+            updateStatus: () => {
+                LocalDB.update('applications', dashboard.currentAppId, { status: document.getElementById('m-status').value });
+                alert("Status Updated!");
+                document.getElementById('modal-detail').classList.remove('open');
+                dashboard.load();
+            },
+
+            // NEW RE-ANALYZE
+            reAnalyze: async () => {
+                const d = dashboard.currentAppData;
+                if(!confirm("Re-run AI analysis on this candidate?")) return;
+                
+                showLoading(true);
+                try {
+                    // Get file content for context
+                    const file = await FileDB.getFile(d.id);
+                    const pdfText = file ? await ai.readPdf(file) : "No PDF Text Found";
+                    
+                    const prompt = `Act as a Recruiter. Re-evaluate this candidate for ${d.jobTitle}. Return ONLY valid JSON. Format: {"matchScore": 85, "status": "Shortlisted/Rejected", "summary": "Updated...", "matching": ["A"], "missing": ["B"], "questions": ["Q1"]} RESUME_TEXT: ${pdfText.substring(0,5000)}`;
+                    
+                    let raw;
+                    try { raw = await ai.generate(prompt); } 
+                    catch(e) { throw new Error("AI Failed: " + e.message); }
+                    
+                    const json = JSON.parse(raw.replace(/```json|```/g, '').trim());
+                    
+                    // Update DB
+                    LocalDB.update('applications', d.id, {
+                        score: json.matchScore,
+                        status: json.status,
+                        summary: json.summary,
+                        matching: json.matching,
+                        missing: json.missing,
+                        questions: json.questions
+                    });
+                    
+                    alert("Re-analysis Complete!");
+                    document.getElementById('modal-detail').classList.remove('open');
+                    dashboard.load();
+                    
+                } catch(e) { alert(e.message); }
+                showLoading(false);
+            },
+
+            generateJD: async () => {
+                const title = document.getElementById('job-title').value;
+                if(!title) return alert("Enter Job Title");
+                const btn = document.querySelector('button[onclick="dashboard.generateJD()"]');
+                btn.innerText = "Writing..."; btn.disabled = true;
+                try {
+                    let text = await ai.generate(`Write a professional 3-sentence Job Description for a "${title}".`); 
+                    document.getElementById('job-desc').value = text;
+                } catch(e) { 
+                    document.getElementById('job-desc').value = "[Demo Mode] Role: " + title + ". Responsibilities: Leading projects, Code review."; 
+                }
+                btn.innerText = "✨ Auto-Write"; btn.disabled = false;
+            },
+
+            draftEmail: async () => {
+                const d = dashboard.currentAppData;
+                const status = document.getElementById('m-status').value;
+                try {
+                    let email = await ai.generate(`Write a polite ${status} email for ${d.name} regarding ${d.jobTitle}.`); 
+                    alert(email);
+                } catch(e) { 
+                    alert(`Dear ${d.name},\n\nStatus update: ${status}.\n\nRecruitment Team`);
+                }
+            },
+
+            startInterview: async () => {
+                document.getElementById('chat-window').style.display = 'flex';
+                const d = dashboard.currentAppData;
+                const miss = (d.missing || []).join(', ');
+                try {
+                    let question = await ai.generate(`Generate ONE hard interview question for a candidate missing: ${miss}`);
+                    const body = document.getElementById('chat-body');
+                    body.innerHTML += `<div class="msg bot">${question}</div>`;
+                    ai.speak(question);
+                } catch(e) { console.error(e); }
+            },
+            
+            addJob: (e) => {
+                e.preventDefault();
+                LocalDB.add('jobs', { title: document.getElementById('job-title').value, description: document.getElementById('job-desc').value, created: new Date() });
+                alert("Job Posted Locally!"); e.target.reset();
+            },
+
+            downloadPdf: async (id) => {
+                // Retrieve name safely from LocalDB
+                const app = LocalDB.get('applications').find(a => a.id === id);
+                const name = app ? app.name.replace(/[^a-z0-9]/gi, '_') : 'document';
+                try {
+                    const file = await FileDB.getFile(id);
+                    if(!file) return alert("File not found locally.");
+                    const url = URL.createObjectURL(file);
+                    const a = document.createElement('a');
+                    a.href = url; a.download = `Resume_${name}.pdf`;
+                    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+                } catch(e) { alert("Error retrieving file."); }
+            },
+
+            del: async (id) => {
+                if(confirm("Delete application?")) {
+                    LocalDB.delete('applications', id);
+                    try { await FileDB.deleteFile(id); } catch(e){}
+                    dashboard.load();
+                }
+            },
+
+            exportCSV: () => {
+                const apps = LocalDB.get('applications');
+                if(apps.length === 0) return alert("No data to export.");
+                let csv = "Name,Email,Role,Score,Status,Date\n";
+                apps.forEach(d => {
+                    csv += `"${d.name}","${d.email}","${d.jobTitle}",${d.score},"${d.status}","${d.timestamp}"\n`;
+                });
+                const blob = new Blob([csv], { type: 'text/csv' });
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url; a.download = 'applications.csv';
+                a.click();
+            },
+
+            openManageJobs: () => {
+                const list = document.getElementById('jobs-list');
+                list.innerHTML = '';
+                const jobs = LocalDB.get('jobs');
+                if(jobs.length === 0) list.innerHTML = '<li>No jobs found.</li>';
+                jobs.forEach(j => {
+                    list.innerHTML += `<li style="margin-bottom:10px; display:flex; justify-content:space-between; background:#f8fafc; padding:10px;"><span>${j.title}</span> <button class="btn btn-sm btn-danger" onclick="dashboard.deleteJob('${j.id}')">Delete</button></li>`;
+                });
+                document.getElementById('modal-jobs').classList.add('open');
+            },
+
+            deleteJob: (id) => {
+                if(confirm('Remove this job posting?')) { LocalDB.delete('jobs', id); dashboard.openManageJobs(); }
+            }
+        };
+
+        const apply = {
+            loadJobs: () => {
+                const sel = document.getElementById('app-job');
+                // USE LOCAL DB JOBS
+                const jobs = LocalDB.get('jobs');
+                
+                sel.innerHTML = '<option value="" disabled selected>-- Select Job --</option>';
+                // Add default dummy job if empty
+                if(jobs.length === 0) {
+                    // Use default seeded job
+                    const opt = document.createElement('option');
+                    opt.value = 'dummy'; opt.textContent = 'Software Engineer (Demo)'; 
+                    opt.dataset.desc = "java python sql react node cloud aws leadership communication"; 
+                    sel.appendChild(opt);
+                }
+                jobs.forEach(j => {
+                    const opt = document.createElement('option');
+                    opt.value = j.id; opt.textContent = j.title; opt.dataset.desc = j.description;
+                    sel.appendChild(opt);
+                });
+            },
+
+            submit: async (e) => {
+                e.preventDefault();
+                const btn = document.getElementById('app-btn');
+                btn.disabled = true; btn.textContent = "Processing...";
+                
+                showLoading(true); // Show Spinner
+
+                try {
+                    const file = document.getElementById('app-file').files[0];
+                    const jobSel = document.getElementById('app-job');
+                    const jobDesc = jobSel.options[jobSel.selectedIndex].dataset.desc;
+                    const pdfText = await ai.readPdf(file);
+                    
+                    let raw;
+                    try {
+                        const prompt = `Act as a Recruiter. Compare Resume to JD. Return ONLY valid JSON. Format: {"matchScore": 85, "status": "Shortlisted/Rejected", "summary": "...", "matching": ["A"], "missing": ["B"], "questions": ["Q1"]} RESUME: ${pdfText.substring(0,8000)} JD: ${jobDesc}`;
+                        raw = await ai.generate(prompt);
+                    } catch (apiErr) {
+                        console.warn("AI Failed: " + apiErr.message);
+                        raw = ai.getMockResponse('json');
+                    }
+
+                    const cleanRaw = raw.replace(/```json|```/g, '').trim();
+                    const json = JSON.parse(cleanRaw);
+
+                    // SAVE TO LOCAL DB
+                    const docId = 'app_' + Date.now();
+                    await FileDB.saveFile(docId, file);
+                    
+                    LocalDB.add('applications', {
+                        id: docId, name: document.getElementById('app-name').value, email: document.getElementById('app-email').value,
+                        jobTitle: jobSel.options[jobSel.selectedIndex].text, 
+                        score: json.matchScore, 
+                        summary: json.summary,
+                        matching: json.matching, 
+                        missing: json.missing, 
+                        questions: json.questions,
+                        status: json.status || (json.matchScore >= 60 ? "Shortlisted" : "Pending"), 
+                        timestamp: new Date()
+                    });
+                    
+                    alert("Submitted Successfully!");
+                    app.nav('home'); e.target.reset();
+                } catch (err) { alert(err.message); } 
+                
+                showLoading(false); // Hide Spinner
+                btn.disabled = false; btn.textContent = "Submit Application";
+            }
+        };
+
+        app.nav('home');
+        
+        // Initialize help text
+        ai.toggleProviderInfo();
+    </script>
+</body>
+</html>
